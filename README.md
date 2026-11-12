@@ -2,8 +2,8 @@
 
 Un desarrollo de **Opters**.
 
-Convierte tu canción en un video para YouTube: ondas que siguen la música, la letra apareciendo
-justo cuando la cantas y la portada al estilo Spotify. Lo editas en el navegador, lo ves al
+Convierte tu canción en un video para cualquier plataforma de video: ondas que siguen la música, la letra apareciendo
+justo cuando la cantas y la portada con estilo. Lo editas en el navegador, lo ves al
 momento y lo exportas en 4K.
 
 ![Editor con la galería de diseños](docs/capturas/01-editor-disenos.png)
