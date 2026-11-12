@@ -1,0 +1,21 @@
+# Video Studio Volt: dependencias de Python (3.13).
+# torch y torchaudio van aparte, desde el índice de CPU de PyTorch (Instalar.ps1 lo hace):
+#   pip install torch==2.6.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cpu
+# Versiones fijas a propósito: son las que se probaron en Windows 11 con el Control de
+# aplicaciones activo (versiones más nuevas de torch/numba tenían DLL que Windows bloqueaba).
+
+# Análisis de audio (ritmo, espectro, secciones)
+numpy==2.2.6
+scipy==1.18.1
+librosa==1.0.0
+numba==0.65.0
+soundfile==0.14.0
+imageio-ffmpeg==0.8.1
+
+# Letra: separar la voz (Demucs) y alinear / transcribir (Whisper vía stable-ts)
+demucs==4.1.0
+stable-ts==2.19.1
+openai-whisper==20250625
+
+# Render del video: el navegador (Edge) dibuja y codifica con la GPU
+playwright==1.64.0

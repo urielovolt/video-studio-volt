@@ -1,0 +1,14 @@
+# Entorno de Python (lo crea Instalar.ps1)
+.venv/
+__pycache__/
+*.pyc
+
+# Las canciones de cada quien: audio, portadas, letras y videos no se suben
+canciones/*
+!canciones/.gitkeep
+
+# Por si acaso quedan fuera de canciones/
+*.mp4
+*.h264
+*.wav
+proceso.log
