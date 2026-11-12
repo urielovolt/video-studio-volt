@@ -8,7 +8,7 @@ Uso:
   python herramienta/render.py canciones/mi-cancion 12.5 48 90            -> fotogramas sueltos (PNG) para revisar
 
 Contrato con la página: window.seek(t), DURATION, ready y SIZE,
-con tres cambios:
+y cómo lo hace:
   - 4K: la página se dibuja a 1920x1080 y Chromium la escala 2x (device_scale_factor).
     YouTube le da mucha más calidad a los videos 4K, aunque se vean en 1080p.
   - Varios navegadores en paralelo (--hilos), cada uno con un tramo; al final se unen
