@@ -1,5 +1,7 @@
 # Video Studio Volt
 
+Un desarrollo de **Opters**.
+
 Convierte tu canción en un video para YouTube: ondas que siguen la música, la letra apareciendo
 justo cuando la cantas y la portada al estilo Spotify. Lo editas en el navegador, lo ves al
 momento y lo exportas en 4K.
@@ -104,3 +106,9 @@ por eso la alineación va sin él.
 Hecho con [Whisper](https://github.com/openai/whisper), [stable-ts](https://github.com/jianfch/stable-ts),
 [Demucs](https://github.com/facebookresearch/demucs), [librosa](https://librosa.org),
 [Playwright](https://playwright.dev) y [FFmpeg](https://ffmpeg.org).
+
+## Licencia
+
+[MIT](LICENSE) © 2026 Opters. Puedes usar, modificar y compartir el código libremente,
+siempre que conserves el aviso de copyright y la licencia. El nombre y el logo de Opters son
+de Opters.
