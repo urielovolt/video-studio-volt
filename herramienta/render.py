@@ -7,7 +7,7 @@ Uso:
   python herramienta/render.py canciones/mi-cancion --fps 60
   python herramienta/render.py canciones/mi-cancion 12.5 48 90            -> fotogramas sueltos (PNG) para revisar
 
-Viene de Reels/render.py (mismo contrato: window.seek, DURATION, ready, SIZE),
+Contrato con la página: window.seek(t), DURATION, ready y SIZE,
 con tres cambios:
   - 4K: la página se dibuja a 1920x1080 y Chromium la escala 2x (device_scale_factor).
     YouTube le da mucha más calidad a los videos 4K, aunque se vean en 1080p.
@@ -15,7 +15,7 @@ con tres cambios:
     sin recomprimir. Como cada cuadro depende solo de t, los tramos casan exacto.
   - El audio es la canción tal cual (AAC 320 kbps), no voz ni música generada.
 Todo se dibuja en <canvas> con la GPU y se captura con toDataURL (más rápido que una
-captura de pantalla). Al final deja hoja de control (control.jpg) como en Reels.
+captura de pantalla). Al final deja una hoja de control (control.jpg).
 """
 import argparse
 import re
@@ -114,7 +114,7 @@ def contar_cuadros(video):
 
 
 def hoja_control(video, out, dur):
-    """Un cuadro cada 2 s en una sola imagen, para revisar de un vistazo (como en Reels)."""
+    """Un cuadro cada 2 s en una sola imagen, para revisar de un vistazo."""
     cols = 8
     rows = max(1, -(-int(dur / 2) // cols))
     subprocess.run([FFMPEG, "-y", "-loglevel", "error", "-i", str(video),
