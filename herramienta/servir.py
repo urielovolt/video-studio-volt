@@ -12,7 +12,7 @@ el editor:
   POST /guardar?c=..&archivo=..           guarda letra.json, estilo.json o letra.txt
   POST /subir?c=..&tipo=cancion|portada   sube el audio o la carátula (cuerpo = el archivo)
   POST /procesar?c=..&paso=..             corre analizar / sincronizar / transcribir en segundo plano
-  POST /procesar?c=..&paso=exportar|prueba&resolucion=..&fps=..&mbps=..&desde=..&hasta=..
+  POST /procesar?c=..&paso=exportar|prueba|canvas&resolucion=..&fps=..&mbps=..&desde=..&hasta=..
                                           renderiza el video (render.py) en segundo plano
   POST /cancelar?c=..                     detiene lo que esté corriendo
   POST /abrir?c=..&archivo=..             muestra el archivo en el Explorador de Windows
@@ -261,7 +261,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
         if url.path == "/procesar":
             paso = q.get("paso", [""])[0]
-            if paso in ("exportar", "prueba"):
+            if paso in ("exportar", "prueba", "canvas"):
                 try:
                     extra = render_args(paso, q)
                 except ValueError:
@@ -358,6 +358,8 @@ def render_args(paso, q):
         extra += ["--hasta", f"{hasta:.3f}"]
     if paso == "prueba":
         extra += ["--salida", "prueba.mp4", "--sin-control"]
+    if paso == "canvas":  # Canvas de Spotify: siempre 1080x1920 a 30 fps, 8 s; sin «desde», busca el coro
+        extra = ["--canvas", "--fps", "30"] + (["--desde", f"{max(0.0, desde):.3f}"] if desde else [])
     return extra
 
 

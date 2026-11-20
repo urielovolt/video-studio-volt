@@ -37,15 +37,23 @@ import servir  # noqa: E402
 FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
 
+CANVAS = False  # --canvas: lienzo vertical 1080x1920 para el Canvas de Spotify
+
+
 def url_de(nombre):
-    return f"http://127.0.0.1:{servir.PORT}/herramienta/video.html?render&c={nombre}"
+    extra = "&formato=canvas" if CANVAS else ""
+    return f"http://127.0.0.1:{servir.PORT}/herramienta/video.html?render&c={nombre}{extra}"
+
+
+def vista():
+    return {"width": 1080, "height": 1920} if CANVAS else {"width": 1920, "height": 1080}
 
 
 def abrir(p, nombre, escala):
     # Con la GPU (Radeon vía ANGLE/D3D11) un cuadro 4K se dibuja en ~50 ms; sin ella, ~470 ms.
     browser = p.chromium.launch(args=["--enable-gpu", "--use-angle=d3d11", "--ignore-gpu-blocklist",
                                       "--disable-gpu-vsync", "--disable-frame-rate-limit"])
-    page = browser.new_page(viewport={"width": 1920, "height": 1080}, device_scale_factor=escala)
+    page = browser.new_page(viewport=vista(), device_scale_factor=escala)
     page.goto(url_de(nombre), wait_until="load", timeout=60000)
     page.wait_for_function("typeof window.seek === 'function'", timeout=60000)
     page.evaluate("window.ready")
@@ -176,7 +184,7 @@ def render_gpu(p, nombre, escala, fps, a0, a1, h264, mbps):
                 "--disable-gpu-vsync", "--disable-frame-rate-limit"])
         except Exception:
             continue
-        page = browser.new_page(viewport={"width": 1920, "height": 1080}, device_scale_factor=escala)
+        page = browser.new_page(viewport=vista(), device_scale_factor=escala)
         page.goto(url_de(nombre), wait_until="load", timeout=60000)
         page.wait_for_function("typeof window.seek === 'function'", timeout=60000)
         page.evaluate("window.ready")
@@ -203,6 +211,71 @@ def render_gpu(p, nombre, escala, fps, a0, a1, h264, mbps):
     browser.close()
 
 
+def inicio_canvas(folder, largo):
+    """Dónde empieza el canvas: la primera sección fuerte (el coro, casi siempre) que alcance."""
+    import json
+    S = json.loads((folder / "analisis.json").read_text(encoding="utf-8")).get("secciones", [])
+    if not S:
+        return 30.0
+    tope = max(x["intensidad"] for x in S)
+    for x in S:
+        if x["intensidad"] >= 0.9 * tope and x["fin"] - x["inicio"] >= largo:
+            return x["inicio"]
+    return max(S, key=lambda x: x["intensidad"])["inicio"]
+
+
+def canvas_spotify(args):
+    """Canvas de Spotify: video vertical 9:16, sin audio, que se repite sin brinco.
+
+    Se dibujan «segundos + cruce» y el final se funde con el principio (xfade): el último cuadro
+    queda igual al que sigue del primero, así el bucle no se nota. Spotify pide 9:16, al menos
+    720 px de alto, de 3 a 8 s, MP4; aquí sale 1080x1920 H.264."""
+    global CANVAS
+    CANVAS = True
+    folder = Path(args.carpeta).resolve()
+    largo, cruce = max(3.0, min(args.segundos, 8.0)), 1.0
+    desde = args.desde if args.desde else inicio_canvas(folder, largo + cruce)
+    fps = args.fps
+    a0 = int(round(desde * fps))
+    a1 = a0 + int(round((largo + cruce) * fps))
+    salida = folder / (Path(args.salida).name if args.salida else "canvas-spotify.mp4")
+    servir.arrancar()
+    from playwright.sync_api import sync_playwright
+    print("FASE preparando", flush=True)
+    print(f"Canvas de Spotify: 1080x1920, {largo:g} s desde {desde:.1f} s, {fps} fps", flush=True)
+    t0 = time.time()
+    with tempfile.TemporaryDirectory() as tmp:
+        h264 = Path(tmp) / "video.h264"
+        with sync_playwright() as p:
+            render_gpu(p, folder.name, 1, fps, a0, a1, h264, 40)
+        print("FASE uniendo", flush=True)
+        # Primero el H.264 crudo a MP4 (marcas de tiempo, sin el relleno de la tasa constante), como en main().
+        solo = Path(tmp) / "video.mp4"
+        subprocess.run(
+            [FFMPEG, "-y", "-loglevel", "error", "-fflags", "+genpts", "-r", str(fps), "-f", "h264", "-i", str(h264),
+             "-c:v", "copy", "-bsf:v", "filter_units=remove_types=12", str(solo)],
+            check=True,
+        )
+        # A = cuadros [cruce, largo+cruce); B = [0, cruce). Al final de A entra B: el último cuadro
+        # del video es el cuadro «cruce» del tramo, que es justo el primero del video.
+        filtro = (f"[0:v]split[a][b];"
+                  f"[a]trim=start={cruce},setpts=PTS-STARTPTS,settb=AVTB,fps={fps}[A];"
+                  f"[b]trim=end={cruce},setpts=PTS-STARTPTS,settb=AVTB,fps={fps}[B];"
+                  f"[A][B]xfade=transition=fade:duration={cruce}:offset={largo - cruce},"
+                  f"scale=out_color_matrix=bt709:out_range=tv,format=yuv420p[v]")
+        subprocess.run(
+            [FFMPEG, "-y", "-loglevel", "error", "-i", str(solo),
+             "-filter_complex", filtro, "-map", "[v]", "-an",
+             "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-profile:v", "high", "-g", str(fps),
+             "-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709",
+             "-movflags", "+faststart", str(salida)],
+            check=True,
+        )
+    n = contar_cuadros(salida)
+    print(f"Listo: {salida}  ({n} cuadros = {n / fps:.2f} s, {(time.time() - t0):.0f} s de render)")
+    print(f"SALIDA {salida}", flush=True)
+
+
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -223,7 +296,12 @@ def main():
                          "40 sirve para borradores rápidos")
     ap.add_argument("--salida", help="nombre del archivo dentro de la carpeta de la canción (p. ej. prueba.mp4)")
     ap.add_argument("--sin-control", action="store_true", help="no hacer la hoja de control (control.jpg)")
+    ap.add_argument("--canvas", action="store_true",
+                    help="Canvas de Spotify: 1080x1920, sin audio, en bucle (canvas-spotify.mp4)")
+    ap.add_argument("--segundos", type=float, default=8.0, help="--canvas: duración del bucle (Spotify: 3 a 8 s)")
     args = ap.parse_args()
+    if args.canvas:
+        return canvas_spotify(args)
 
     folder = Path(args.carpeta).resolve()
     nombre = folder.name

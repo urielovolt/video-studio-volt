@@ -9,7 +9,10 @@
 //   m.dibujar(t);
 
 (function () {
-  const W = 1920, H = 1080;
+  // ?formato=canvas → vertical 9:16 (1080x1920) para el Canvas de Spotify: la portada arriba al
+  // centro, las ondas debajo y sin textos (Spotify ya pone título, artista y controles encima).
+  const CANVAS = new URLSearchParams(location.search).get('formato') === 'canvas';
+  const W = CANVAS ? 1080 : 1920, H = CANVAS ? 1920 : 1080;
   const SALIDA = 0.22;  // segundos que tarda un verso en irse
 
   const ESTILO_BASE = {
@@ -165,7 +168,7 @@
       this.portadaBlur = null;
       if (!img) return;
       const c = document.createElement('canvas');
-      c.width = 480; c.height = 270;
+      c.width = W / 4; c.height = H / 4;
       const g = c.getContext('2d');
       const k = Math.max(c.width / img.width, c.height / img.height) * 1.25;
       g.filter = 'blur(18px) saturate(1.3)';
@@ -176,6 +179,11 @@
     // Dónde va cada cosa según la portada: carátula, columna de letra y franja de ondas.
     marco() {
       const s = this.s;
+      if (CANVAS) {
+        // Todo dentro del 80 % central: «Preview for narrower devices» recorta las orillas.
+        const p = this.portada && s.portadaPos !== 'no' ? { cx: W / 2, cy: H * 0.3, tam: 620 } : null;
+        return { portada: p, tx: W / 2, tw: W * 0.8, x0: 120, x1: W - 120 };
+      }
       if (!this.portada || s.portadaPos === 'no') return { tx: W / 2, tw: W * 0.8, x0: 150, x1: W - 150 };
       const tam = s.portadaTam;
       if (s.portadaPos === 'centro') {
@@ -194,6 +202,10 @@
 
     ponerEstilo(estilo) {
       this.s = Object.assign({}, ESTILO_BASE, estilo || {});
+      if (CANVAS) Object.assign(this.s, {
+        mostrarInfo: false, mostrarTitulo: false, fundidoFinal: 0,
+        ondaY: this.s.portadaPos === 'no' ? 0.5 : 0.62, sensibilidad: this.s.sensibilidad * 1.15,
+      }, estilo && estilo.canvas || {});
       this.layouts.clear();
     }
 
@@ -300,7 +312,7 @@
       c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.shadowBlur = 0;
       this.caratula(ctxT);
       this.titulo(ctxT);
-      this.letra(ctxT);
+      if (!CANVAS || s.letraCanvas) this.letra(ctxT);
       this.acabado(ctxT);
     }
 
@@ -718,7 +730,7 @@
     acabado({ t, s }) {
       const c = this.ctx;
       if (s.vineta > 0) {
-        const g = c.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, W * 0.72);
+        const g = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.72);
         g.addColorStop(0, 'rgba(0,0,0,0)');
         g.addColorStop(1, `rgba(0,0,0,${0.85 * s.vineta})`);
         c.fillStyle = g;
@@ -746,6 +758,7 @@
 
   Motor.W = W;
   Motor.H = H;
+  Motor.CANVAS = CANVAS;
   Motor.ESTILO_BASE = ESTILO_BASE;
   Motor.PESOS = PESOS;
   Motor.paleta = paleta;

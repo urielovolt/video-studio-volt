@@ -184,6 +184,7 @@
   .listo.mal h3 { color: var(--err); }
   .listo .ruta { font-size: 12.5px; color: var(--ink-soft); word-break: break-all; background: #fff; border: 1px solid var(--hair); border-radius: 8px; padding: 8px 10px; margin: 6px 0 10px; user-select: all; }
   .listo video { width: 100%; border-radius: 10px; background: #000; margin-bottom: 10px; display: block; }
+  .listo video.canvas { width: auto; height: 420px; max-width: 100%; }
 
   /* ---------- Asistente de canción nueva ---------- */
   #asistente { position: fixed; inset: 0; z-index: 80; background: rgba(20,24,29,.42); backdrop-filter: blur(6px); display: none; place-items: center; padding: 24px; }
@@ -295,8 +296,9 @@
     im.src = base + src;
   });
   const NOMBRE_PASO = { analizar: 'Analizando la canción', sincronizar: 'Sincronizando la letra con la voz', transcribir: 'Sacando la letra del audio',
-                       prueba: 'Renderizando la prueba', exportar: 'Exportando el video' };
-  const ES_RENDER = p => p === 'prueba' || p === 'exportar';
+                       prueba: 'Renderizando la prueba', exportar: 'Exportando el video', canvas: 'Creando el canvas de Spotify' };
+  const ES_RENDER = p => p === 'prueba' || p === 'exportar' || p === 'canvas';
+  const CAJA = { prueba: 'Prueba', exportar: 'Exportar', canvas: 'Canvas' };  // avPrueba/okPrueba, etc.
   const PESTANA_DE = p => (ES_RENDER(p) ? 'exportar' : 'letra');
   // Lo último que dijo el proceso, en palabras normales.
   function fraseDe(log) {
@@ -518,9 +520,9 @@
         procInicio = null;
         if (ES_RENDER(terminado)) {
           pintarRender(e);
-          if (bien) aviso(terminado === 'prueba' ? 'La prueba está lista en «Exportar».' : 'Tu video está listo. La ruta está en «Exportar».', false, 6000);
+          if (bien) aviso(terminado === 'prueba' ? 'La prueba está lista en «Exportar».' : terminado === 'canvas' ? 'El canvas de Spotify está listo en «Exportar».' : 'Tu video está listo. La ruta está en «Exportar».', false, 6000);
         } else if (alTerminarProc) alTerminarProc(bien, terminado);
-      } else if (ES_RENDER(primera) && e.salida && !$('okPrueba')?.classList.contains('on') && !$('okExportar')?.classList.contains('on')) {
+      } else if (ES_RENDER(primera) && e.salida && !['Prueba', 'Exportar', 'Canvas'].some(k => $('ok' + k)?.classList.contains('on'))) {
         // Al abrir la página: el último render ya había terminado; muestra dónde quedó.
         pintarRender({ ...e, codigo: 0 });
       }
@@ -915,6 +917,12 @@
       <button class="bt bt-ink bt-grande" id="bExportar">Exportar video</button>
       <div class="avance-render" id="avExportar"></div>
       <div class="listo" id="okExportar"></div>`)));
+    p.append(bloque('Canvas de Spotify', html(`
+      <p class="nota">Video vertical 9:16 (1080×1920) de 8 segundos, sin audio, que se repite sin que se note el corte. Lleva la portada y las ondas, sin letra: Spotify ya pone encima el título y los controles. Se sube en Spotify for Artists → la canción → Canvas.</p>
+      <div class="acciones"><button class="bt bt-claro" id="bCanvas">Crear canvas desde el coro</button>
+        <button class="bt bt-claro" id="bCanvasAqui">Desde <span id="cDesde" class="num">0:00</span></button></div>
+      <div class="avance-render" id="avCanvas"></div>
+      <div class="listo" id="okCanvas"></div>`)));
 
     function estimar() {
       const res = +opc.resolucion, fps = +opc.fps, mb = +opc.mbps;
@@ -929,19 +937,25 @@
       if (procInicio) return aviso('Espera a que termine lo que está corriendo (arriba).', true);
       if (sucio.letra || sucio.estilo) await guardar();
       let extra = `&resolucion=${opc.resolucion}&fps=${opc.fps}&mbps=${opc.mbps}`;
+      if (paso === 'canvas' || paso === 'canvasAqui') {
+        extra = paso === 'canvasAqui' ? `&desde=${Math.max(0.01, Math.min(audio.paused ? t : audio.currentTime, DUR - 9)).toFixed(2)}` : '';
+        paso = 'canvas';
+      }
       if (paso === 'prueba') {
         const desde = Math.max(0, Math.min(audio.paused ? t : audio.currentTime, DUR - 15));
         extra += `&desde=${desde.toFixed(2)}&hasta=${Math.min(DUR, desde + 15).toFixed(2)}`;
       }
       try {
         await api(`/procesar?c=${encodeURIComponent(C)}&paso=${paso}${extra}`, '');
-        $(paso === 'prueba' ? 'okPrueba' : 'okExportar').className = 'listo';
+        $('ok' + CAJA[paso]).className = 'listo';
         pintarRender({ corriendo: true, paso, fase: 'preparando', progreso: null });
         setTimeout(vigilarYa, 400);
       } catch (e) { aviso(e.message, true); }
     }
     $('bPrueba').onclick = () => lanzarRender('prueba');
     $('bExportar').onclick = () => lanzarRender('exportar');
+    $('bCanvas').onclick = () => lanzarRender('canvas');
+    $('bCanvasAqui').onclick = () => lanzarRender('canvasAqui');
   }
 
   // Avance del render en su panel: barra, porcentaje, velocidad y tiempo restante.
@@ -955,13 +969,13 @@
     return (e.progreso.total - e.progreso.hechos) / e.progreso.vel + 15;  // + unir el audio
   }
   function pintarRender(e) {
-    const esPrueba = e.paso === 'prueba';
-    const av = $(esPrueba ? 'avPrueba' : 'avExportar'), ok = $(esPrueba ? 'okPrueba' : 'okExportar');
+    const esPrueba = e.paso === 'prueba', esCanvas = e.paso === 'canvas';
+    const av = $('av' + (CAJA[e.paso] || 'Exportar')), ok = $('ok' + (CAJA[e.paso] || 'Exportar'));
     if (!av) return;
-    $('bPrueba').disabled = $('bExportar').disabled = !!e.corriendo;
+    for (const b of ['bPrueba', 'bExportar', 'bCanvas', 'bCanvasAqui']) $(b).disabled = !!e.corriendo;
     if (e.corriendo) {
       const pct = porcentaje(e), falta = restante(e);
-      const fase = e.fase === 'uniendo' ? 'Uniendo el video con el audio' : e.progreso ? 'Dibujando y codificando cuadros' : 'Preparando el navegador';
+      const fase = e.fase === 'uniendo' ? (esCanvas ? 'Cerrando el bucle' : 'Uniendo el video con el audio') : e.progreso ? 'Dibujando y codificando cuadros' : 'Preparando el navegador';
       av.className = 'avance-render on' + (e.progreso || e.fase === 'uniendo' ? '' : ' preparando');
       av.innerHTML = `<div class="fila"><span class="pct">${Math.floor(pct)}%</span><span class="que">${fase}</span></div>
         <div class="tubo"><i style="width:${pct}%"></i></div>
@@ -980,8 +994,9 @@
     if (e.codigo === 0 && e.salida) {
       const nombre = esc(e.salida.nombre), url = `${base}${encodeURIComponent(e.salida.nombre)}?v=${Date.now()}`;
       ok.className = 'listo on';
-      ok.innerHTML = `<h3>✓ ${esPrueba ? 'Prueba lista' : 'Video listo'}</h3>
+      ok.innerHTML = `<h3>✓ ${esPrueba ? 'Prueba lista' : esCanvas ? 'Canvas listo' : 'Video listo'}</h3>
         ${esPrueba ? `<video src="${url}" controls autoplay></video>` : ''}
+        ${esCanvas ? `<video class="canvas" src="${url}" autoplay loop muted playsinline></video>` : ''}
         <small>Se guardó en:</small><div class="ruta">${esc(e.salida.ruta)}</div>
         <div class="acciones"><button class="bt bt-ink" data-abrir="reproducir">Reproducir</button>
           <button class="bt bt-claro" data-abrir="carpeta">Mostrar en la carpeta</button>
@@ -1275,6 +1290,8 @@
     $('tiempo').textContent = `${fmt(now)} / ${fmt(DUR)}`;
     const pd = $('pDesde');
     if (pd) { const d = mmss(Math.max(0, Math.min(now, DUR - 15))); if (pd.textContent !== d) pd.textContent = d; }
+    const cd = $('cDesde');
+    if (cd) { const d = mmss(Math.max(0, Math.min(now, DUR - 9))); if (cd.textContent !== d) cd.textContent = d; }
     requestAnimationFrame(cuadro);
   }
   cuadro();
