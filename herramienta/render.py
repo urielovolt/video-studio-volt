@@ -38,10 +38,12 @@ FFMPEG = imageio_ffmpeg.get_ffmpeg_exe()
 
 
 CANVAS = False  # --canvas: lienzo vertical 1080x1920 para el Canvas de Spotify
+MOTION = "cine"  # --motion: cine | cronografo | ondas (la versión con la portada fija)
+LAZO = (0.0, 8.0)  # inicio y largo del bucle: canvas.js hace que todo dé vueltas exactas en él
 
 
 def url_de(nombre):
-    extra = "&formato=canvas" if CANVAS else ""
+    extra = f"&formato=canvas&motion={MOTION}&inicio={LAZO[0]:.3f}&largo={LAZO[1]:g}" if CANVAS else ""
     return f"http://127.0.0.1:{servir.PORT}/herramienta/video.html?render&c={nombre}{extra}"
 
 
@@ -224,25 +226,52 @@ def inicio_canvas(folder, largo):
     return max(S, key=lambda x: x["intensidad"])["inicio"]
 
 
+def fondo_canvas(folder):
+    """canvas-fondo.jpg: recorte vertical 9:16 de la portada, sin sus textos, a 1188x2112 (10 % de
+    sobra para que la cámara se mueva). Sale de portada-original.* (más resolución) o de la
+    portada. estilo.json → canvas.encuadre = [centro x, centro y, alto], todo de 0 a 1."""
+    import json
+    est = json.loads((folder / "estilo.json").read_text(encoding="utf-8")) if (folder / "estilo.json").exists() else {}
+    fuentes = sorted(folder.glob("portada-original.*")) + [folder / est.get("portada", "portada.jpg")]
+    fuente = next((f for f in fuentes if f.exists()), None)
+    if not fuente:
+        return
+    cx, cy, alto = (est.get("canvas", {}).get("encuadre") or [0.5, 0.5, 1.0])[:3]
+    ancho = alto * 9 / 16
+    x0 = min(max(cx - ancho / 2, 0), 1 - ancho)
+    y0 = min(max(cy - alto / 2, 0), 1 - alto)
+    subprocess.run(
+        [FFMPEG, "-y", "-loglevel", "error", "-i", str(fuente),
+         "-vf", f"crop=iw*{ancho:.5f}:ih*{alto:.5f}:iw*{x0:.5f}:ih*{y0:.5f},scale=1188:2112:flags=lanczos",
+         "-frames:v", "1", "-q:v", "2", str(folder / "canvas-fondo.jpg")],
+        check=True,
+    )
+    print(f"  Fondo: {fuente.name} recortado en x {x0:.2f}–{x0 + ancho:.2f}, y {y0:.2f}–{y0 + alto:.2f}", flush=True)
+
+
 def canvas_spotify(args):
     """Canvas de Spotify: video vertical 9:16, sin audio, que se repite sin brinco.
 
     Se dibujan «segundos + cruce» y el final se funde con el principio (xfade): el último cuadro
     queda igual al que sigue del primero, así el bucle no se nota. Spotify pide 9:16, al menos
     720 px de alto, de 3 a 8 s, MP4; aquí sale 1080x1920 H.264."""
-    global CANVAS
-    CANVAS = True
+    global CANVAS, MOTION, LAZO
+    CANVAS, MOTION = True, args.motion
     folder = Path(args.carpeta).resolve()
     largo, cruce = max(3.0, min(args.segundos, 8.0)), 1.0
     desde = args.desde if args.desde else inicio_canvas(folder, largo + cruce)
     fps = args.fps
     a0 = int(round(desde * fps))
+    # El cruce toma los cuadros [cruce, largo+cruce): el bucle visible empieza en desde+cruce.
+    LAZO = (a0 / fps + cruce, largo)
+    if MOTION != "ondas":
+        fondo_canvas(folder)
     a1 = a0 + int(round((largo + cruce) * fps))
-    salida = folder / (Path(args.salida).name if args.salida else "canvas-spotify.mp4")
+    salida = folder / (Path(args.salida).name if args.salida else f"canvas-spotify-{MOTION}.mp4")
     servir.arrancar()
     from playwright.sync_api import sync_playwright
     print("FASE preparando", flush=True)
-    print(f"Canvas de Spotify: 1080x1920, {largo:g} s desde {desde:.1f} s, {fps} fps", flush=True)
+    print(f"Canvas de Spotify ({MOTION}): 1080x1920, {largo:g} s desde {desde:.1f} s, {fps} fps", flush=True)
     t0 = time.time()
     with tempfile.TemporaryDirectory() as tmp:
         h264 = Path(tmp) / "video.h264"
@@ -298,6 +327,8 @@ def main():
     ap.add_argument("--sin-control", action="store_true", help="no hacer la hoja de control (control.jpg)")
     ap.add_argument("--canvas", action="store_true",
                     help="Canvas de Spotify: 1080x1920, sin audio, en bucle (canvas-spotify.mp4)")
+    ap.add_argument("--motion", default="cine", choices=["cine", "cronografo", "ondas"],
+                    help="--canvas: estilo del motion hecho con la portada")
     ap.add_argument("--segundos", type=float, default=8.0, help="--canvas: duración del bucle (Spotify: 3 a 8 s)")
     args = ap.parse_args()
     if args.canvas:

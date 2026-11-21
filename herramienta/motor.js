@@ -203,9 +203,12 @@
     ponerEstilo(estilo) {
       this.s = Object.assign({}, ESTILO_BASE, estilo || {});
       if (CANVAS) Object.assign(this.s, {
-        mostrarInfo: false, mostrarTitulo: false, fundidoFinal: 0,
+        mostrarInfo: false, mostrarTitulo: false, fundidoFinal: 0, motion: 'cine',
         ondaY: this.s.portadaPos === 'no' ? 0.5 : 0.62, sensibilidad: this.s.sensibilidad * 1.15,
       }, estilo && estilo.canvas || {});
+      // ?motion=cine|cronografo|ondas (lo manda render.py) gana sobre estilo.canvas.
+      const mo = CANVAS && new URLSearchParams(location.search).get('motion');
+      if (mo) this.s.motion = mo;
       this.layouts.clear();
     }
 
@@ -305,6 +308,11 @@
       };
 
       this.m = this.marco();
+      // Canvas de Spotify con portada: el motion de canvas.js reemplaza fondo, ondas y carátula.
+      if (CANVAS && this.s.motion !== 'ondas' && this.motionCanvas && this.motionCanvas(ctxT)) {
+        this.acabado(ctxT);
+        return;
+      }
       this.fondo(ctxT);
       if (s.particulas > 0) this.polvo(ctxT);
       const D = Motor.DISENOS || {};

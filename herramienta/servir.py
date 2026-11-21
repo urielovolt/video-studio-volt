@@ -153,6 +153,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
         url = urlparse(self.path)
         q = parse_qs(url.query)
+        if url.path in ("/", "/herramienta", "/herramienta/"):  # la raíz lleva directo al editor
+            self.send_response(302)
+            self.send_header("Location", "/herramienta/video.html" + (f"?{url.query}" if url.query else ""))
+            self.end_headers()
+            return
         if url.path == "/canciones":
             CANCIONES.mkdir(exist_ok=True)
             lista = []
@@ -359,7 +364,10 @@ def render_args(paso, q):
     if paso == "prueba":
         extra += ["--salida", "prueba.mp4", "--sin-control"]
     if paso == "canvas":  # Canvas de Spotify: siempre 1080x1920 a 30 fps, 8 s; sin «desde», busca el coro
-        extra = ["--canvas", "--fps", "30"] + (["--desde", f"{max(0.0, desde):.3f}"] if desde else [])
+        motion = q.get("motion", ["cine"])[0]
+        if motion not in ("cine", "cronografo", "ondas"):
+            raise ValueError
+        extra = ["--canvas", "--fps", "30", "--motion", motion] + (["--desde", f"{max(0.0, desde):.3f}"] if desde else [])
     return extra
 
 

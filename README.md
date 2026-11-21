@@ -22,7 +22,9 @@ momento y lo exportas en 4K.
 - **Exportar** en 4K, 2K o Full HD, a 24, 30 o 60 cuadros por segundo, con prueba rápida de
   15 segundos, barra de avance y tiempo restante.
 - **Canvas de Spotify**: video vertical 9:16 (1080×1920) de 8 segundos, sin audio y en bucle sin
-  corte, con la portada y las ondas, listo para subir en Spotify for Artists.
+  corte, listo para subir en Spotify for Artists. Usa la foto de tu portada sin sus textos como una
+  toma de cine: cámara lenta, un haz de luz con polvo flotando y, si quieres, una carátula de
+  cronógrafo cuya aguja da una vuelta por bucle. Todo se mueve con la música.
 - Todo corre en tu computadora: nada se sube a internet.
 
 | Letra | Exportar |
@@ -60,8 +62,10 @@ ayuda mucho al exportar, pero no es obligatoria.
 2. **Letra**: pega tu letra y «Sincronizar con la voz». Arriba ves qué está haciendo y cuánto lleva.
 3. **Diseño**: elige la onda, los colores (o los de tu portada) y el ambiente.
 4. **Exportar**: «Probar 15 s» para ver cómo sale y luego «Exportar video». Al terminar te dice
-   dónde quedó el archivo. Ahí mismo, «Canvas de Spotify» deja `canvas-spotify.mp4` (desde el coro
-   o desde donde esté la reproducción).
+   dónde quedó el archivo. Ahí mismo, «Canvas de Spotify» deja `canvas-spotify-<estilo>.mp4` (desde el
+   coro o desde donde esté la reproducción). El recorte vertical sale de `portada-original.*` (si
+   existe, por la resolución) o de la portada; se ajusta en `estilo.json` con
+   `"canvas": {"encuadre": [centro x, centro y, alto]}` (de 0 a 1) para dejar fuera los textos.
 
 Atajos: Espacio reproduce, Inicio vuelve al principio, ←/→ saltan 2 s, Ctrl+S guarda, Ctrl+Z deshace.
 
@@ -89,7 +93,7 @@ suben a git.
 .venv\Scripts\python herramienta\sincronizar.py canciones\mi-cancion
 .venv\Scripts\python herramienta\render.py canciones\mi-cancion --desde 60 --hasta 75
 .venv\Scripts\python herramienta\render.py canciones\mi-cancion --resolucion 2160 --fps 30
-.venv\Scripts\python herramienta\render.py canciones\mi-cancion --canvas
+.venv\Scripts\python herramienta\render.py canciones\mi-cancion --canvas --motion cronografo
 ```
 
 ### Consejos de calidad

@@ -247,6 +247,7 @@
 
 <script src="motor.js"></script>
 <script src="disenos.js"></script>
+<script src="canvas.js"></script>
 <script>
 (async function () {
   const q = new URLSearchParams(location.search);
@@ -320,6 +321,7 @@
     const motor = new Motor(stage, window.devicePixelRatio || 1);
     await motor.cargar(analisis, letra, estilo, await cargarImagen(estilo.imagen));
     motor.ponerPortada(await cargarImagen(estilo.portada));
+    if (Motor.CANVAS) motor.fondoCanvas = await cargarImagen('canvas-fondo.jpg?v=' + Date.now());  // lo prepara render.py
     window.DURATION = analisis.duracion;
     window.SIZE = [Motor.W, Motor.H];
     window.seek = t => motor.dibujar(t);
@@ -918,7 +920,11 @@
       <div class="avance-render" id="avExportar"></div>
       <div class="listo" id="okExportar"></div>`)));
     p.append(bloque('Canvas de Spotify', html(`
-      <p class="nota">Video vertical 9:16 (1080×1920) de 8 segundos, sin audio, que se repite sin que se note el corte. Lleva la portada y las ondas, sin letra: Spotify ya pone encima el título y los controles. Se sube en Spotify for Artists → la canción → Canvas.</p>
+      <p class="nota">Video vertical 9:16 (1080×1920) de 8 segundos, sin audio, que se repite sin que se note el corte. Usa la foto de la portada sin sus textos, recortada en vertical (estilo.json → canvas.encuadre: centro x, centro y y alto, de 0 a 1), como una toma de cine que se mueve con la música, sin letra: Spotify ya pone encima el título y los controles. Se sube en Spotify for Artists → la canción → Canvas.</p>
+      <div class="campo"><label>Estilo</label><select id="cMotion">
+        <option value="cronografo">Cine + cronógrafo · luz, polvo y una aguja que da una vuelta por bucle</option>
+        <option value="cine">Cine · la foto como toma de película: cámara lenta, luz y polvo</option>
+        <option value="ondas">Portada y ondas · la portada fija con barras abajo</option></select></div>
       <div class="acciones"><button class="bt bt-claro" id="bCanvas">Crear canvas desde el coro</button>
         <button class="bt bt-claro" id="bCanvasAqui">Desde <span id="cDesde" class="num">0:00</span></button></div>
       <div class="avance-render" id="avCanvas"></div>
@@ -939,6 +945,7 @@
       let extra = `&resolucion=${opc.resolucion}&fps=${opc.fps}&mbps=${opc.mbps}`;
       if (paso === 'canvas' || paso === 'canvasAqui') {
         extra = paso === 'canvasAqui' ? `&desde=${Math.max(0.01, Math.min(audio.paused ? t : audio.currentTime, DUR - 9)).toFixed(2)}` : '';
+        extra += `&motion=${$('cMotion').value}`;
         paso = 'canvas';
       }
       if (paso === 'prueba') {
